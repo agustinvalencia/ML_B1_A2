@@ -1,0 +1,154 @@
+---
+title: "Machine Learning - Block 01 Lab 2"
+author: "Agustín Valencia"
+date: "12/5/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+#### -----------------------------------------
+####                Setup
+#### -----------------------------------------
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(tree)
+set.seed(12345)
+
+```
+
+# Assignment 2. Analysis of credit scoring
+
+The data file creditscoring.xls contains data retrieved from a database in a private enterprise. Each row contains information about one customer. The variable good/bad indicates how the customers have managed their loans. The other features are potential predictors. Your task is to derive a prediction model that can be used to predict whether or not a new customer is likely to pay back the loan.
+
+
+### 1. Import the data to R and divide into training/validation/test as 50/25/25: use data partitioning code specified in Lecture 1e.
+
+```{r q1_split_data, echo=FALSE}
+
+
+
+#### -----------------------------------------
+####                Question 1
+#### -----------------------------------------
+
+
+## 1.1 Split data
+
+data <- read_xls("data/creditscoring.xls")
+n <- dim(data)[1]
+data$good_bad <- as.factor(data$good_bad)
+
+# training set
+id <- sample(1:n, floor(n*0.5))
+train <- data[id,]
+
+# validation set
+id1 <- setdiff(1:n, id)
+id2 <- sample(id1, floor(n*0.25))
+valid <- data[id2,]
+
+# test set
+id3 <- setdiff(id1,id2)
+test <- data[id3,]
+
+cat("Data set size \t\t:", dim(data))
+cat("Training set size \t:", dim(train))
+cat("Validation set size \t:", dim(valid))
+cat("Testing set size \t:", dim(test))
+```
+
+### 2. Fit a decision tree to the training data by using the following measures of impurity and report the misclassification rates for the training and test data. Choose the measure providing the better results for the following steps.
+
+```{r q1_tree_main, echo=FALSE}
+
+## 1.2 Trees 
+
+f <- good_bad ~ .
+
+# util function
+get_performance <- function(targets, predictions, text) {
+    cat("Classification Performance :", text, "\n")
+    t <- table(targets, predictions)
+    print("Confusion Matrix")
+    print(t)
+    tn <- t[1,1]
+    tp <- t[2,2]
+    fp <- t[1,2]
+    fn <- t[2,1]
+    total <- dim(test)[1]
+    tpr <- tp/(tp+fp) * 100
+    tnr <- tn/(tn+fn) * 100
+    fpr <- fp/(tp+fp) * 100
+    fnr <- fn/(tn+fn) * 100
+    
+    cat("Rates details:\n")
+    cat(" TPR =", tpr, "% -")
+    cat(" TNR =", tnr, "% -")
+    cat(" FPR =", fpr, "% -")
+    cat(" FNR =", fnr, "%")
+    cat("\n Misclassification Rate = ", (fp+fn)/total * 100, "%\n")
+}
+
+```
+
+#### a. Deviance
+
+```{r q1_tree_deviance, echo=FALSE}
+
+
+### 1.2.a Deviance Tree
+devTree <- tree(formula = f, data = train, split = "deviance")
+#plot(devTree)
+#text(devTree)
+summary(devTree)
+
+true <- test$good_bad
+predictions <- predict(devTree, newdata = test, type = "class")
+get_performance(true, predictions, "Tree. split = deviance")
+
+```
+
+\newpage
+
+#### b. Gini index
+
+```{r q1_tree_gini, echo=FALSE}
+
+
+### 1.2.a Deviance Tree
+giniTree <- tree(formula = f, data = train, split = "gini")
+#plot(giniTree)
+#text(giniTree)
+summary(giniTree)
+
+predictions <- predict(giniTree, newdata = test, type = "class")
+get_performance(true, predictions, "Tree. split = gini")
+```
+
+In summary, the tree trained using deviance as split metho
+
+### 3. Use training and validation sets to choose the optimal tree depth. Present the graphs of the dependence of deviances for the training and the validation data on the number of leaves. Report the optimal tree, report it’s depth and the variables used by the tree. Interpret the information provided by the tree structure. Estimate the misclassification rate for the test data.
+
+
+
+### 4. Use training data to perform classification using Naïve Bayes and report the confusion matrices and misclassification rates for the training and for the test data. Compare the results with those from step 3.
+
+### 5. Use the optimal tree and the Naïve Bayes model to classify the test data by using the following principle: $\hat{Y} = 1$ if $p(Y=good|X) > \pi$, otherwise $\hat{Y}=0$ where $\pi = 0.05, 0.1, 0.15, ..., 0.9, 0.95$. Compute the TPR and FPR values for the two models and plot the corresponding ROC curves. Conclusion?
+
+### 6. Repeat Naïve Bayes classification as it was in step 4 but use the following loss matrix.
+
+and report the confusion matrix for the training and test data. Compare the results with the resukts from step 4 and discuss how the rates have changed and why.
+
+
+
+
+
+
+
+
+\newpage
+
+# Appendix A : Code
+
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
