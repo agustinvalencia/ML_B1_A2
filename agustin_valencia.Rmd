@@ -125,7 +125,7 @@ predictions <- predict(giniTree, newdata = test, type = "class")
 get_performance(true, predictions, "Tree. split = gini")
 ```
 
-In summary, the tree trained using deviance as split metho
+In summary, the tree trained using deviance as split method performs slighty better than the one using gini index, because it gets better True Positive and Misclassification rates, also it is considerably smaller having 12 terminal nodes against the 70 from the Gini one.
 
 ### 3. Use training and validation sets to choose the optimal tree depth. Present the graphs of the dependence of deviances for the training and the validation data on the number of leaves. Report the optimal tree, report it’s depth and the variables used by the tree. Interpret the information provided by the tree structure. Estimate the misclassification rate for the test data.
 
