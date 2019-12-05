@@ -10,12 +10,12 @@ output: pdf_document
 ####                Setup
 #### -----------------------------------------
 knitr::opts_chunk$set(echo = TRUE)
+RNGversion("3.5.1")
 library(readxl)
 library(tree)
 library(ggplot2)
 library(e1071)
 set.seed(12345)
-
 ```
 
 # Assignment 2. Analysis of credit scoring
@@ -181,20 +181,43 @@ In the graph are shown the deviances obtained depending on the depths. Black cur
 ### 1.3 Optimal depth by train/validation
 nb <- naiveBayes(f, data=train)
 
-trainPred <- predict(nb, newdata=train)
-get_performance(train$good_bad, trainPred, "Naive Bayes - Train")
-testPred <- predict(nb, newdata=test)
-get_performance(test$good_bad, testPred, "Naive Bayes - test")
+nbTrainPred <- predict(nb, newdata=train)
+get_performance(train$good_bad, nbTrainPred, "Naive Bayes - Train")
+nbTestPred <- predict(nb, newdata=test)
+get_performance(test$good_bad, nbTestPred, "Naive Bayes - test")
 
 ```
 
 
 ### 5. Use the optimal tree and the Naïve Bayes model to classify the test data by using the following principle: $\hat{Y} = 1$ if $p(Y=good|X) > \pi$, otherwise $\hat{Y}=0$ where $\pi = 0.05, 0.1, 0.15, ..., 0.9, 0.95$. Compute the TPR and FPR values for the two models and plot the corresponding ROC curves. Conclusion?
 
-```{r}
+```{r q1_roc_curves, echo=FALSE}
+optTree <- prune.tree(devTree, best = optimal)
+plot(optTree)
+text(optTree)
+nbTestPred <- predict(nb, newdata=test, type="raw")
+otTestPred <- predict(optTree, newdata=test, type="vector")
+nbTestPred <- nbTestPred[,"good"]
+otTestPred <- otTestPred[,"good"]
+
 thresholds <- seq(.05, .95, .05)
-optTree <- trees[optimal]
-optTree.predictions <- predict(optTree, newdata=test)
+scoresNaiveBayes  <- data.frame(matrix(,nrow=length(nbTestPred), ncol=length(thresholds)))
+nbFPR = vector(length = length(thresholds))
+nTPR = vector(length = length(thresholds))
+scoresOptimalTree <- data.frame(matrix(,nrow=length(otTestPred), ncol=length(thresholds)))
+    FPR = vector(length = length(thresholds)),
+    TPR = vector(length = length(thresholds))
+colnames(scoresOptimalTree) <- thresholds
+colnames(scoresNaiveBayes) <- thresholds
+
+for(i in 1:length(thresholds)) {
+    scoresNaiveBayes[,i] <- as.numeric(nbTestPred > thresholds[i])
+    scoresOptimalTree[,i] <- as.numeric(otTestPred > thresholds[i])
+}
+
+p <- ggplot()
+p <- p + geom_line(data = scoresNaiveBayes, aes(x=thresholds, ))
+
 ```
 
 
