@@ -12,6 +12,8 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 library(readxl)
 library(tree)
+library(ggplot2)
+library(e1071)
 set.seed(12345)
 
 ```
@@ -115,7 +117,7 @@ get_performance(true, predictions, "Tree. split = deviance")
 ```{r q1_tree_gini, echo=FALSE}
 
 
-### 1.2.a Deviance Tree
+### 1.2.b Gini Index
 giniTree <- tree(formula = f, data = train, split = "gini")
 #plot(giniTree)
 #text(giniTree)
@@ -125,15 +127,76 @@ predictions <- predict(giniTree, newdata = test, type = "class")
 get_performance(true, predictions, "Tree. split = gini")
 ```
 
-In summary, the tree trained using deviance as split method performs slighty better than the one using gini index, because it gets better True Positive and Misclassification rates, also it is considerably smaller having 12 terminal nodes against the 70 from the Gini one.
+In summary, the tree trained using deviance as split method performs slighty better than the one using Gini index because it gets better True Positive and Misclassification rates, also it is considerably smaller having 12 terminal nodes against the 70 from the Gini one.
 
 ### 3. Use training and validation sets to choose the optimal tree depth. Present the graphs of the dependence of deviances for the training and the validation data on the number of leaves. Report the optimal tree, report it’s depth and the variables used by the tree. Interpret the information provided by the tree structure. Estimate the misclassification rate for the test data.
 
+Crossvalidating the deviance-trained tree:
+
+```{r q1_devtree_optimal_depth, echo=FALSE}
+
+### 1.3 Optimal depth by train/validation
+maxDepth <- 12
+depth <- 2:maxDepth
+trainScore <- rep(0,maxDepth)
+testScore <- rep(0,maxDepth)
+trees <- vector(length = maxDepth-1)
+
+for (i in depth) {
+    prunedTree <- prune.tree(devTree, best=i)
+    trees[i] <- prunedTree
+    predictions <- predict(prunedTree, newdata=valid, type="tree")
+    trainScore[i] <- deviance(prunedTree)
+    testScore[i] <- deviance(predictions)
+}
+trainScore <- trainScore[depth]
+testScore <- testScore[depth]
+df <- data.frame(
+    train = trainScore,
+    test = testScore, 
+    depth = depth
+)
+p <- ggplot(data=df) + 
+    geom_line(aes(x = depth, y=train), color="black") +
+    geom_line(aes(x = depth, y=test), color="orange") +
+    geom_point(aes(x = depth, y=train), color="black") +
+    geom_point(aes(x = depth, y=test), color="orange") +
+    ylab("Deviance") + xlab("Depth") 
+p
+
+optDev <- min(testScore)
+optimal <- depth[which.min(testScore)]
+cat("The optimal tree is at depth", optimal, "with deviance", optDev)
+
+```
+
+In the graph are shown the deviances obtained depending on the depths. Black curve corresponds to train scores and orange to validation. The optimal tree while using validation data is at depth = 4 having a deviance of 310.41
 
 
 ### 4. Use training data to perform classification using Naïve Bayes and report the confusion matrices and misclassification rates for the training and for the test data. Compare the results with those from step 3.
 
+
+```{r q1_naive_bayes, echo=FALSE}
+
+### 1.3 Optimal depth by train/validation
+nb <- naiveBayes(f, data=train)
+
+trainPred <- predict(nb, newdata=train)
+get_performance(train$good_bad, trainPred, "Naive Bayes - Train")
+testPred <- predict(nb, newdata=test)
+get_performance(test$good_bad, testPred, "Naive Bayes - test")
+
+```
+
+
 ### 5. Use the optimal tree and the Naïve Bayes model to classify the test data by using the following principle: $\hat{Y} = 1$ if $p(Y=good|X) > \pi$, otherwise $\hat{Y}=0$ where $\pi = 0.05, 0.1, 0.15, ..., 0.9, 0.95$. Compute the TPR and FPR values for the two models and plot the corresponding ROC curves. Conclusion?
+
+```{r}
+thresholds <- seq(.05, .95, .05)
+optTree <- trees[optimal]
+optTree.predictions <- predict(optTree, newdata=test)
+```
+
 
 ### 6. Repeat Naïve Bayes classification as it was in step 4 but use the following loss matrix.
 
