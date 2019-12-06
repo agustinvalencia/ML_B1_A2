@@ -23,18 +23,18 @@ set.seed(12345)
 The data file creditscoring.xls contains data retrieved from a database in a private enterprise. Each row contains information about one customer. The variable good/bad indicates how the customers have managed their loans. The other features are potential predictors. Your task is to derive a prediction model that can be used to predict whether or not a new customer is likely to pay back the loan.
 
 
-### 1. Import the data to R and divide into training/validation/test as 50/25/25: use data partitioning code specified in Lecture 1e.
+1. Import the data to R and divide into training/validation/test as 50/25/25: use data partitioning code specified in Lecture 1e.
 
-```{r q1_split_data, echo=FALSE}
+```{r q2_split_data, echo=FALSE}
 
 
 
 #### -----------------------------------------
-####                Question 1
+####                Question 2
 #### -----------------------------------------
 
 
-## 1.1 Split data
+## 2.1 Split data
 
 data <- read_xls("data/creditscoring.xls")
 n <- dim(data)[1]
@@ -59,11 +59,11 @@ cat("Validation set size \t:", dim(valid))
 cat("Testing set size \t:", dim(test))
 ```
 
-### 2. Fit a decision tree to the training data by using the following measures of impurity and report the misclassification rates for the training and test data. Choose the measure providing the better results for the following steps.
+2. Fit a decision tree to the training data by using the following measures of impurity and report the misclassification rates for the training and test data. Choose the measure providing the better results for the following steps.
 
-```{r q1_tree_main, echo=FALSE}
+```{r q2_tree_main, echo=FALSE}
 
-## 1.2 Trees 
+## 2.2 Trees 
 
 f <- good_bad ~ .
 
@@ -93,9 +93,9 @@ get_performance <- function(targets, predictions, text) {
 
 ```
 
-#### a. Deviance
+a. Deviance
 
-```{r q1_tree_deviance, echo=FALSE}
+```{r q2_tree_deviance, echo=FALSE}
 
 
 ### 1.2.a Deviance Tree
@@ -111,9 +111,9 @@ get_performance(true, predictions, "Tree. split = deviance")
 ```
 
 
-#### b. Gini index
+b. Gini index
 
-```{r q1_tree_gini, echo=FALSE}
+```{r q2_tree_gini, echo=FALSE}
 
 
 ### 1.2.b Gini Index
@@ -128,13 +128,13 @@ get_performance(true, predictions, "Tree. split = gini")
 
 In summary, the tree trained using deviance as split method performs slighty better than the one using Gini index because it gets better True Positive and Misclassification rates, also it is considerably smaller having 12 terminal nodes against the 70 from the Gini one.
 
-### 3. Use training and validation sets to choose the optimal tree depth. Present the graphs of the dependence of deviances for the training and the validation data on the number of leaves. Report the optimal tree, report it’s depth and the variables used by the tree. Interpret the information provided by the tree structure. Estimate the misclassification rate for the test data.
+3. Use training and validation sets to choose the optimal tree depth. Present the graphs of the dependence of deviances for the training and the validation data on the number of leaves. Report the optimal tree, report it’s depth and the variables used by the tree. Interpret the information provided by the tree structure. Estimate the misclassification rate for the test data.
 
 Crossvalidating the deviance-trained tree:
 
-```{r q1_devtree_optimal_depth, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
+```{r q2_devtree_optimal_depth, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
 
-### 1.3 Optimal depth by train/validation
+### 2.3 Optimal depth by train/validation
 maxDepth <- 12
 depth <- 2:maxDepth
 trainScore <- rep(0,maxDepth)
@@ -156,10 +156,8 @@ df <- data.frame(
     depth = depth
 )
 p <- ggplot(data=df) + 
-    geom_line(aes(x = depth, y=train), color="black") +
-    geom_line(aes(x = depth, y=test), color="orange") +
-    geom_point(aes(x = depth, y=train), color="black") +
-    geom_point(aes(x = depth, y=test), color="orange") +
+    geom_line(aes(x = depth, y=train, color="Training")) +
+    geom_line(aes(x = depth, y=test, color="Testing")) +
     ylab("Deviance") + xlab("Depth") 
 p
 
@@ -172,12 +170,12 @@ cat("The optimal tree is at depth", optimal, "with deviance", optDev)
 In the graph are shown the deviances obtained depending on the depths. Black curve corresponds to train scores and orange to validation. The optimal tree while using validation data is at depth = 4 having a deviance of 310.41
 
 
-### 4. Use training data to perform classification using Naïve Bayes and report the confusion matrices and misclassification rates for the training and for the test data. Compare the results with those from step 3.
+4. Use training data to perform classification using Naïve Bayes and report the confusion matrices and misclassification rates for the training and for the test data. Compare the results with those from step 3.
 
 
-```{r q1_naive_bayes, echo=FALSE, warning=FALSE}
+```{r q2_naive_bayes, echo=FALSE, warning=FALSE}
 
-### 1.3 Optimal depth by train/validation
+### 2.3 Optimal depth by train/validation
 nb <- naiveBayes(f, data=train)
 
 nbTrainPred <- predict(nb, newdata=train)
@@ -188,9 +186,9 @@ get_performance(test$good_bad, nbTestPred, "Naive Bayes - test")
 ```
 
 
-### 5. Use the optimal tree and the Naïve Bayes model to classify the test data by using the following principle: $\hat{Y} = 1$ if $p(Y=good|X) > \pi$, otherwise $\hat{Y}=0$ where $\pi = 0.05, 0.1, 0.15, ..., 0.9, 0.95$. Compute the TPR and FPR values for the two models and plot the corresponding ROC curves. Conclusion?
+5. Use the optimal tree and the Naïve Bayes model to classify the test data by using the following principle: $\hat{Y} = 1$ if $p(Y=good|X) > \pi$, otherwise $\hat{Y}=0$ where $\pi = 0.05, 0.1, 0.15, ..., 0.9, 0.95$. Compute the TPR and FPR values for the two models and plot the corresponding ROC curves. Conclusion?
 
-```{r q1_roc_curves, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
+```{r q2_roc_curves, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
 optTree <- prune.tree(devTree, best = optimal)
 plot(optTree)
 text(optTree)
@@ -229,10 +227,8 @@ otFPR <- otFP/totalNegative
 otTPR <- otTP/totalPositive
 
 p <- ggplot()
-p <- p + geom_line(aes(x=nbFPR, y=nbTPR), color="black")
-p <- p + geom_line(aes(x=otFPR, y=otTPR), color="orange")
-p <- p + geom_point(aes(x=nbFPR, y=nbTPR), color="black")
-p <- p + geom_point(aes(x=otFPR, y=otTPR), color="orange")
+p <- p + geom_line(aes(x=nbFPR, y=nbTPR, color="Naive Bayes"))
+p <- p + geom_line(aes(x=otFPR, y=otTPR, color="Optimal Tree"))
 p <- p + ylab("TPR") + xlab("FPR") + ggtitle("ROCs")
 p
 
@@ -240,13 +236,72 @@ p
 
 Orange curve is the ROC for the optimal tree and black curve corresponds to naive Bayes classifier. 
 
-### 6. Repeat Naïve Bayes classification as it was in step 4 but use the following loss matrix.  and report the confusion matrix for the training and test data. Compare the results with the resukts from step 4 and discuss how the rates have changed and why.
+6. Repeat Naïve Bayes classification as it was in step 4 but use the following loss matrix.  and report the confusion matrix for the training and test data. Compare the results with the results from step 4 and discuss how the rates have changed and why.
 
-```{r}
+```{r q2_6, echo=FALSE}
 
 ```
 
 
+\newpage
+
+# Assignment 3 : Uncertainty estimation
+
+The data file State.csv contains per capita state and local public expenditures and associated state demographic and economic characteristics, 1960, and there are variables
+
+- MET: Percentage of population living in standard metropolitan areas
+- EX: Per capita state and local public expenditures ($)
+
+1. Reorder your data with respect to the increase of MET and plot EX versus MET. Discuss what kind of model can be appropriate here. Use the reordered data in steps 2-5.
+
+```{r q3_reorder, echo=FALSE}
+data <- read.csv2("data/State.csv")
+data <- data[order(data$EX),]
+```
+
+2. Use package tree and fit a regression tree model with target EX and feature MET in which the number of the leaves is selected by cross-validation, use the entire data set and set minimum number of observations in a leaf equal to 8 (setting minsize in tree.control). Report the selected tree. Plot the original and the fitted data and histogram of residuals. Comment on the distribution of the residuals and the quality of the fit.
+
+```{r q3_tree_train, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
+formula <- EX ~ MET
+regTree <- tree(formula = formula,  
+                data = data,  
+                control = tree.control(nobs = length(data$EX), minsize = 8)
+            )
+
+depth <- 2:12
+testScore <- vector(length = (length(depth)-1))
+for (i in depth) {
+    prunedTree <- prune.tree(regTree, best=i)
+    predictions <- predict(prunedTree, newdata=data, type="tree")
+    testScore[i] <- deviance(predictions)
+}
+optScore <- min(testScore)
+optDepth <- depth[which.min(testScore)-1]
+optTree <- tree(formula = formula,
+                data = data,
+                control = tree.control(nobs = length(data$EX),minsize = 8)
+            )
+plot(optTree)
+text(optTree)
+predictions <- predict(optTree, newdata = data)
+p <- ggplot()
+p <- p + geom_point(aes(x=data$MET, y=data$EX, color="real"))
+p <- p + geom_point(aes(x=data$MET, y=predictions, color="predicted"))
+p <- p + ylab("EX") + xlab("EM") + ggtitle("Regression Tree")
+p
+
+residuals <- data$EX - predictions
+h <- ggplot(as.data.frame(residuals), aes(x=residuals)) + geom_histogram()
+h <- h + ggtitle("Residuals Histogram")
+h
+```
+
+
+3. Compute and plot the 95% confidence bands for the regression tree model from step 2 (fit a regression tree with the same settings and the same number of leaves as in step 2 to the resampled data) by using a non-parametric bootstrap. Comment whether the band is smooth or bumpy and try to explain why. Consider the width of the confidence band and comment whether results of the regression model in step 2 seem to be reliable.
+
+4. Compute and plot the 95% confidence and prediction bands the regression tree model from step 2 (fit a regression tree with the same settings and the same number of leaves as in step 2 to the resampled data) by using a parametric bootstrap, assume $Y ~ N(\mu_i, \sigma^2)$ where $\mu_i$ are labels in the tree leaves and $\sigma^2$ is the residual variance. Consider the width of the confidence band and comment whether results of the regression model in step 2 seem to be reliable. Does it look like only 5% of data are outside the prediction band? Should it be?
+
+5. Consider the histogram of residuals from step 2 and suggest what kind of bootstrap is actually more appropriate here.
 
 
 
