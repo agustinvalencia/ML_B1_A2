@@ -190,7 +190,7 @@ get_performance(test$good_bad, nbTestPred, "Naive Bayes - test")
 
 ### 5. Use the optimal tree and the Naïve Bayes model to classify the test data by using the following principle: $\hat{Y} = 1$ if $p(Y=good|X) > \pi$, otherwise $\hat{Y}=0$ where $\pi = 0.05, 0.1, 0.15, ..., 0.9, 0.95$. Compute the TPR and FPR values for the two models and plot the corresponding ROC curves. Conclusion?
 
-```{r q1_roc_curves, echo=FALSE, out.height='40%', fig.align='center'}
+```{r q1_roc_curves, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
 optTree <- prune.tree(devTree, best = optimal)
 plot(optTree)
 text(optTree)
@@ -198,47 +198,53 @@ nbTestPred <- predict(nb, newdata=test, type="raw")
 otTestPred <- predict(optTree, newdata=test, type="vector")
 nbTestPred <- nbTestPred[,"good"]
 otTestPred <- otTestPred[,"good"]
+totalNegative <- sum(test$good_bad == "bad")
+totalPositive <- sum(test$good_bad == "good")
 
 thresholds <- seq(.05, .95, .05)
-nbFPR = vector(length = length(thresholds))
-nbTPR = vector(length = length(thresholds))
-otFPR = vector(length = length(thresholds))
-otTPR = vector(length = length(thresholds))
+nbFP = vector(length = length(thresholds))
+nbTP = vector(length = length(thresholds))
+otFP = vector(length = length(thresholds))
+otTP = vector(length = length(thresholds))
 
 for(i in 1:length(thresholds)) {
-    nbTable <- table(test$good_bad, as.numeric(nbTestPred > thresholds[i]))
-    nbFPR[i] <- nbTable[1,2]
-    nbTPR[i] <- nbTable[2,2]
-    otTable <- table(test$good_bad, as.numeric(otTestPred > thresholds[i]))
-    if (length(otTable) == 2) {
-        if (i == 1) {
-            otTPR[i] <- 0
-            otFPR[i] <- 0
-        } else {
-            otTPR[i] <- otTPR[i-1]
-            otFPR[i] <- otFPR[i-1]
-        }
-    } else {
-        otTPR[i] <- otTable[2,2]
-        otFPR[i] <- otTable[1,2]
-    }
+    # Naive Bayes
+    nbPred <- as.numeric(nbTestPred > thresholds[i])
+    nbPredFactor <- factor(x = nbPred, levels = c(0,1), labels=c("good", "bad"))
+    nbTable <- table(test$good_bad, nbPredFactor)
+    nbFP[i] <- nbTable[1,2]
+    nbTP[i] <- nbTable[2,2]
+    
+    # Optimal Tree
+    otPred <- as.numeric(otTestPred > thresholds[i])
+    otPredFactor <- factor(x = otPred, levels = c(0,1), labels=c("good", "bad"))
+    otTable <- table(test$good_bad, otPredFactor)
+    otFP[i] <- otTable[1,2]
+    otTP[i] <- otTable[2,2]
 }
+
+nbFPR <- nbFP/totalNegative
+nbTPR <- nbTP/totalPositive
+otFPR <- otFP/totalNegative
+otTPR <- otTP/totalPositive
 
 p <- ggplot()
 p <- p + geom_line(aes(x=nbFPR, y=nbTPR), color="black")
 p <- p + geom_line(aes(x=otFPR, y=otTPR), color="orange")
 p <- p + geom_point(aes(x=nbFPR, y=nbTPR), color="black")
 p <- p + geom_point(aes(x=otFPR, y=otTPR), color="orange")
-p <- p + ggtitle("ROC")
+p <- p + ylab("TPR") + xlab("FPR") + ggtitle("ROCs")
 p
 
 ```
 
+Orange curve is the ROC for the optimal tree and black curve corresponds to naive Bayes classifier. 
 
-### 6. Repeat Naïve Bayes classification as it was in step 4 but use the following loss matrix.
+### 6. Repeat Naïve Bayes classification as it was in step 4 but use the following loss matrix.  and report the confusion matrix for the training and test data. Compare the results with the resukts from step 4 and discuss how the rates have changed and why.
 
-and report the confusion matrix for the training and test data. Compare the results with the resukts from step 4 and discuss how the rates have changed and why.
+```{r}
 
+```
 
 
 
