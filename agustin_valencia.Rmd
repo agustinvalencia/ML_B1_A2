@@ -110,7 +110,6 @@ get_performance(true, predictions, "Tree. split = deviance")
 
 ```
 
-\newpage
 
 #### b. Gini index
 
@@ -133,7 +132,7 @@ In summary, the tree trained using deviance as split method performs slighty bet
 
 Crossvalidating the deviance-trained tree:
 
-```{r q1_devtree_optimal_depth, echo=FALSE}
+```{r q1_devtree_optimal_depth, echo=FALSE, warning=FALSE}
 
 ### 1.3 Optimal depth by train/validation
 maxDepth <- 12
@@ -176,7 +175,7 @@ In the graph are shown the deviances obtained depending on the depths. Black cur
 ### 4. Use training data to perform classification using Naïve Bayes and report the confusion matrices and misclassification rates for the training and for the test data. Compare the results with those from step 3.
 
 
-```{r q1_naive_bayes, echo=FALSE}
+```{r q1_naive_bayes, echo=FALSE, warning=FALSE}
 
 ### 1.3 Optimal depth by train/validation
 nb <- naiveBayes(f, data=train)
@@ -201,22 +200,37 @@ nbTestPred <- nbTestPred[,"good"]
 otTestPred <- otTestPred[,"good"]
 
 thresholds <- seq(.05, .95, .05)
-scoresNaiveBayes  <- data.frame(matrix(,nrow=length(nbTestPred), ncol=length(thresholds)))
 nbFPR = vector(length = length(thresholds))
-nTPR = vector(length = length(thresholds))
-scoresOptimalTree <- data.frame(matrix(,nrow=length(otTestPred), ncol=length(thresholds)))
-    FPR = vector(length = length(thresholds)),
-    TPR = vector(length = length(thresholds))
-colnames(scoresOptimalTree) <- thresholds
-colnames(scoresNaiveBayes) <- thresholds
+nbTPR = vector(length = length(thresholds))
+otFPR = vector(length = length(thresholds))
+otTPR = vector(length = length(thresholds))
 
 for(i in 1:length(thresholds)) {
-    scoresNaiveBayes[,i] <- as.numeric(nbTestPred > thresholds[i])
-    scoresOptimalTree[,i] <- as.numeric(otTestPred > thresholds[i])
+    nbTable <- table(test$good_bad, as.numeric(nbTestPred > thresholds[i]))
+    nbFPR[i] <- nbTable[1,2]
+    nbTPR[i] <- nbTable[2,2]
+    otTable <- table(test$good_bad, as.numeric(otTestPred > thresholds[i]))
+    if (length(otTable) == 2) {
+        if (i == 1) {
+            otTPR[i] <- 0
+            otFPR[i] <- 0
+        } else {
+            otTPR[i] <- otTPR[i-1]
+            otFPR[i] <- otFPR[i-1]
+        }
+    } else {
+        otTPR[i] <- otTable[2,2]
+        otFPR[i] <- otTable[1,2]
+    }
 }
 
 p <- ggplot()
-p <- p + geom_line(data = scoresNaiveBayes, aes(x=thresholds, ))
+p <- p + geom_line(aes(x=nbFPR, y=nbTPR), color="black")
+p <- p + geom_line(aes(x=otFPR, y=otTPR), color="orange")
+p <- p + geom_point(aes(x=nbFPR, y=nbTPR), color="black")
+p <- p + geom_point(aes(x=otFPR, y=otTPR), color="orange")
+p <- p + ggtitle("ROC")
+p
 
 ```
 
