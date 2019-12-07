@@ -15,6 +15,7 @@ library(readxl)
 library(tree)
 library(ggplot2)
 library(e1071)
+library(boot)
 set.seed(12345)
 ```
 
@@ -95,14 +96,14 @@ get_performance <- function(targets, predictions, text) {
 
 a. Deviance
 
-```{r q2_tree_deviance, echo=FALSE}
+```{r q2_tree_deviance, echo=FALSE, out.height='30%', fig.align='center'}
 
 
 ### 1.2.a Deviance Tree
 devTree <- tree(formula = f, data = train, split = "deviance")
-#plot(devTree)
-#text(devTree)
-summary(devTree)
+plot(devTree)
+text(devTree)
+#summary(devTree)
 
 true <- test$good_bad
 predictions <- predict(devTree, newdata = test, type = "class")
@@ -113,14 +114,14 @@ get_performance(true, predictions, "Tree. split = deviance")
 
 b. Gini index
 
-```{r q2_tree_gini, echo=FALSE}
+```{r q2_tree_gini, echo=FALSE, fig.align='center'}
 
 
 ### 1.2.b Gini Index
 giniTree <- tree(formula = f, data = train, split = "gini")
-#plot(giniTree)
+plot(giniTree)
 #text(giniTree)
-summary(giniTree)
+#summary(giniTree)
 
 predictions <- predict(giniTree, newdata = test, type = "class")
 get_performance(true, predictions, "Tree. split = gini")
@@ -135,35 +136,48 @@ Crossvalidating the deviance-trained tree:
 ```{r q2_devtree_optimal_depth, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
 
 ### 2.3 Optimal depth by train/validation
-maxDepth <- 12
-depth <- 2:maxDepth
-trainScore <- rep(0,maxDepth)
-testScore <- rep(0,maxDepth)
-trees <- vector(length = maxDepth-1)
 
-for (i in depth) {
-    prunedTree <- prune.tree(devTree, best=i)
-    trees[i] <- prunedTree
-    predictions <- predict(prunedTree, newdata=valid, type="tree")
-    trainScore[i] <- deviance(prunedTree)
-    testScore[i] <- deviance(predictions)
+analyzeOptTreeDepth <- function(atree, maxDepth, newdata) {
+    trainScore <- rep(0,maxDepth)
+    testScore <- rep(0,maxDepth)
+    depth <- 2:maxDepth
+    
+    for (i in depth) {
+        prunedTree <- prune.tree(atree, best=i)
+        predictions <- predict(prunedTree, newdata=newdata, type="tree")
+        trainScore[i] <- deviance(prunedTree)
+        testScore[i] <- deviance(predictions)
+    }
+    trainScore <- trainScore[depth]
+    testScore <- testScore[depth]
+    df <- data.frame(
+        train = trainScore,
+        test = testScore, 
+        depth = depth
+    )   
+    optDev <- min(testScore)
+    optimal <- depth[which.min(testScore)]
+    return ( list (
+            df = df, 
+            optimalDeviance = optDev,
+            optimalDepth = optimal
+        )
+    )
 }
-trainScore <- trainScore[depth]
-testScore <- testScore[depth]
-df <- data.frame(
-    train = trainScore,
-    test = testScore, 
-    depth = depth
-)
-p <- ggplot(data=df) + 
+
+maxDepth <- 12
+results <- analyzeOptTreeDepth(devTree, maxDepth, valid)
+p <- ggplot(data=results$df) + 
     geom_line(aes(x = depth, y=train, color="Training")) +
-    geom_line(aes(x = depth, y=test, color="Testing")) +
-    ylab("Deviance") + xlab("Depth") 
+    geom_line(aes(x = depth, y=test, color="Validation")) +
+    geom_point(aes(x = depth, y=train, color="Training")) +
+    geom_point(aes(x = depth, y=test, color="Validation")) +
+    scale_x_continuous(breaks = results$df$depth) +
+    scale_y_continuous(breaks = seq(250, 650, by=50)) +
+    ylab("Deviance") + xlab("Depth") + ggtitle("Optimal Tree Crossvalidation Scores") 
 p
 
-optDev <- min(testScore)
-optimal <- depth[which.min(testScore)]
-cat("The optimal tree is at depth", optimal, "with deviance", optDev)
+cat("The optimal tree is at depth", results$optimalDepth, "with deviance", results$optimalDeviance)
 
 ```
 
@@ -188,17 +202,25 @@ get_performance(test$good_bad, nbTestPred, "Naive Bayes - test")
 
 5. Use the optimal tree and the Naïve Bayes model to classify the test data by using the following principle: $\hat{Y} = 1$ if $p(Y=good|X) > \pi$, otherwise $\hat{Y}=0$ where $\pi = 0.05, 0.1, 0.15, ..., 0.9, 0.95$. Compute the TPR and FPR values for the two models and plot the corresponding ROC curves. Conclusion?
 
-```{r q2_roc_curves, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
-optTree <- prune.tree(devTree, best = optimal)
+Based on the results above we construct the optimal tree and it is obtained: 
+
+```{r q2_optimal_tree, echo=FALSE, warning=FALSE, out.height='30%', fig.align='center'}
+devTree <- tree(formula = f, data = train, split = "deviance")
+optTree <- prune.tree(devTree, best = results$optimalDepth)
 plot(optTree)
 text(optTree)
+```
+
+Then using the given thresholds the following ROC are obtained:
+
+```{r q2_roc_curves, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
 nbTestPred <- predict(nb, newdata=test, type="raw")
 otTestPred <- predict(optTree, newdata=test, type="vector")
 nbTestPred <- nbTestPred[,"good"]
 otTestPred <- otTestPred[,"good"]
+
 totalNegative <- sum(test$good_bad == "bad")
 totalPositive <- sum(test$good_bad == "good")
-
 thresholds <- seq(.05, .95, .05)
 nbFP = vector(length = length(thresholds))
 nbTP = vector(length = length(thresholds))
@@ -212,7 +234,7 @@ for(i in 1:length(thresholds)) {
     nbTable <- table(test$good_bad, nbPredFactor)
     nbFP[i] <- nbTable[1,2]
     nbTP[i] <- nbTable[2,2]
-    
+
     # Optimal Tree
     otPred <- as.numeric(otTestPred > thresholds[i])
     otPredFactor <- factor(x = otPred, levels = c(0,1), labels=c("good", "bad"))
@@ -234,7 +256,6 @@ p
 
 ```
 
-Orange curve is the ROC for the optimal tree and black curve corresponds to naive Bayes classifier. 
 
 6. Repeat Naïve Bayes classification as it was in step 4 but use the following loss matrix.  and report the confusion matrix for the training and test data. Compare the results with the results from step 4 and discuss how the rates have changed and why.
 
@@ -255,6 +276,14 @@ The data file State.csv contains per capita state and local public expenditures 
 1. Reorder your data with respect to the increase of MET and plot EX versus MET. Discuss what kind of model can be appropriate here. Use the reordered data in steps 2-5.
 
 ```{r q3_reorder, echo=FALSE}
+
+
+
+#### -----------------------------------------
+####                Question 3
+#### -----------------------------------------
+
+
 data <- read.csv2("data/State.csv")
 data <- data[order(data$EX),]
 ```
@@ -262,36 +291,51 @@ data <- data[order(data$EX),]
 2. Use package tree and fit a regression tree model with target EX and feature MET in which the number of the leaves is selected by cross-validation, use the entire data set and set minimum number of observations in a leaf equal to 8 (setting minsize in tree.control). Report the selected tree. Plot the original and the fitted data and histogram of residuals. Comment on the distribution of the residuals and the quality of the fit.
 
 ```{r q3_tree_train, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
-formula <- EX ~ MET
-regTree <- tree(formula = formula,  
+regTree <- tree(formula = EX ~ MET,  
                 data = data,  
                 control = tree.control(nobs = length(data$EX), minsize = 8)
             )
 
-depth <- 2:12
-testScore <- vector(length = (length(depth)-1))
-for (i in depth) {
-    prunedTree <- prune.tree(regTree, best=i)
-    predictions <- predict(prunedTree, newdata=data, type="tree")
-    testScore[i] <- deviance(predictions)
-}
-optScore <- min(testScore)
-optDepth <- depth[which.min(testScore)-1]
-optTree <- tree(formula = formula,
-                data = data,
-                control = tree.control(nobs = length(data$EX),minsize = 8)
-            )
+maxDepth <- 12
+results <- analyzeOptTreeDepth(regTree, maxDepth, data)
+plot(regTree)
+text(regTree)
+```
+
+Finding the optimal tree using crossvalidation:
+
+```{r q3_tree_plot, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
+cv.regTree <- cv.tree(regTree)
+plot(cv.regTree$size, cv.regTree$dev, type="b", col="red")
+```
+
+
+It can be observed that the optimal tree performance is at size=3. Pruning the tree to fit that it is obtained the following tree:
+
+
+```{r q3_tree_prune, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+optTree <- prune.tree(regTree, best = 3)
 plot(optTree)
 text(optTree)
+```
+
+Comparing the actual data to the predictions made by the tree:
+
+```{r q3_tree_predictions, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 predictions <- predict(optTree, newdata = data)
 p <- ggplot()
 p <- p + geom_point(aes(x=data$MET, y=data$EX, color="real"))
 p <- p + geom_point(aes(x=data$MET, y=predictions, color="predicted"))
 p <- p + ylab("EX") + xlab("EM") + ggtitle("Regression Tree")
 p
+```
 
+And analyzing the residuals for the shown predictions:
+
+```{r q3_tree_residuals, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 residuals <- data$EX - predictions
-h <- ggplot(as.data.frame(residuals), aes(x=residuals)) + geom_histogram()
+h <- ggplot(as.data.frame(residuals), aes(x=residuals))
+h <- h + geom_histogram()
 h <- h + ggtitle("Residuals Histogram")
 h
 ```
@@ -299,11 +343,116 @@ h
 
 3. Compute and plot the 95% confidence bands for the regression tree model from step 2 (fit a regression tree with the same settings and the same number of leaves as in step 2 to the resampled data) by using a non-parametric bootstrap. Comment whether the band is smooth or bumpy and try to explain why. Consider the width of the confidence band and comment whether results of the regression model in step 2 seem to be reliable.
 
+```{r q3_nonparam_bootstrap, echo=FALSE}
+
+doBoot <- function(inData, ind) {
+    # extract bootstrap sample
+    localData <- inData[ind,]
+    n <- nrow(localData)
+    # fit the model
+    fit <- tree(EX ~ MET, localData, 
+                control = tree.control(nobs=n, minsize=8)
+           )
+    pruned <- prune.tree(fit, best=3)
+    predictions <- predict(pruned, newdata=localData)
+    return(predictions)
+}
+
+res <- boot(data, doBoot, R=1000)
+envlp <- envelope(res, level=0.95)
+
+# plot(x=data$MET, y = predictions, xlab="MET", ylab="EX",
+#      type="o", col="red", main="Regression Tree 95%")
+# points(x=data$MET, y=data$EX)
+# points(x=data$MET, y=envlp$point[1,], type="l", col="blue")
+# points(x=data$MET, y=envlp$point[2,], type="l", col="blue")
+
+df <- data.frame(
+    MET = data$MET,
+    EX = data$EX,
+    predictions = predictions,
+    upBound = envlp$point[1,],
+    lowBound = envlp$point[2,]
+)
+
+p <- ggplot(data = df)
+p <- p + geom_ribbon(aes(x=MET, ymax=upBound, ymin=lowBound), color="gray")
+p <- p + geom_point(aes(x=MET, y=EX, color="real"))
+p <- p + geom_line(aes(x=MET, y=predictions, color="predicted"))
+p <- p + geom_point(aes(x=MET, y=predictions, color="predicted"))
+p <- p + ylab("EX") + xlab("EM") + ggtitle("Regression Tree - 95% confidence")
+p <- p + scale_y_continuous(breaks = seq(0, 600, by=20))
+p
+
+```
+
+
+
 4. Compute and plot the 95% confidence and prediction bands the regression tree model from step 2 (fit a regression tree with the same settings and the same number of leaves as in step 2 to the resampled data) by using a parametric bootstrap, assume $Y ~ N(\mu_i, \sigma^2)$ where $\mu_i$ are labels in the tree leaves and $\sigma^2$ is the residual variance. Consider the width of the confidence band and comment whether results of the regression model in step 2 seem to be reliable. Does it look like only 5% of data are outside the prediction band? Should it be?
 
 5. Consider the histogram of residuals from step 2 and suggest what kind of bootstrap is actually more appropriate here.
 
 
+\newpage
+
+# Assignment 4 - Principal components
+
+The data file NIRspectra.csv contains near-infrared spectra and viscosity levels for a collection of diesel fuels. Your task is to investigate how the measured spectra can be used to predict the viscosity.
+```{r q4_init, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+
+#### -----------------------------------------
+####                Question 4
+#### -----------------------------------------
+
+data <- read.csv2("data/NIRSpectra.csv")
+```
+
+1. Conduct a standard PCA by using the feature space and provide a plot explaining how much variation is explained by each feature. Does the plot show how many PC should be extracted? Select the minimal number of components explaining at least 99% of the total variance. Provide also a plot of the scores in the coordinates (PC1, PC2). Are there unusual diesel fuels according to this plot?
+
+According to the following plot very few Principal Components explain most of the variance, which implies that the data set dimension could be reduced from over a hundred to just a few variables. 
+
+```{r q4_PCA_plot, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+
+# 4.1 - PCA
+res <- prcomp(data) 
+lambda <- res$sdev^2
+prop <- lambda/sum(lambda) * 100
+ggplot() + geom_point(aes(x=1:length(prop), y=prop)) + 
+    ylab("Explained Variance [%]") + xlab("Component") + 
+    ggtitle("Principal Components Contribution")
+print("Principal Components Contributions")
+```
+
+The printout below confirms that just the two first PCs represent 99.64% of the total variance. So the dimensionality could be reduced from 127 dimensions to just two.
+
+```{r q4_PCA_text, echo=FALSE}
+sprintf("%2.3f", prop)
+```
+
+
+2. Make trace plots of the loadings of the components selected in step 1. Is there any principle component that is explained by mainly a few original features?
+
+```{r echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+
+# 4.2 - PCA Trace plots
+x = 1:nrow(res$rotation)
+ggplot() + geom_line(aes(x=x, y=res$rotation[,1])) +
+    ggtitle("Traceplot PC1") + ylab("U") + xlab("Index")
+ggplot() + geom_line(aes(x=x, y=res$rotation[,2])) +
+    ggtitle("Traceplots PC2") + ylab("U") + xlab("Index")
+```
+
+PC1 is explained almost by Viscosity, PC2 explains a linear combination of the other variables.
+
+3. Perform Independent Component Analysis with the number of components selected in step 1 (set seed 12345). Check the documentation for the fastICA method in R and do the following:
+
+
+
+a. Compute $W' = K \cdot W$ and present the columns of  $W'$ in form of the trace plots. Compare with the trace plots in step 2 and make conclusions. What kind of measure is represented by the matrix $W'$?
+
+b. Make a plot of the scores of the first two latent features and compare it with the score plot from step 1.
 
 
 
