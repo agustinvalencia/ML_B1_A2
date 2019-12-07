@@ -16,6 +16,7 @@ library(tree)
 library(ggplot2)
 library(e1071)
 library(boot)
+library(fastICA)
 set.seed(12345)
 ```
 
@@ -419,9 +420,7 @@ According to the following plot very few Principal Components explain most of th
 res <- prcomp(data) 
 lambda <- res$sdev^2
 prop <- lambda/sum(lambda) * 100
-ggplot() + geom_point(aes(x=1:length(prop), y=prop)) + 
-    ylab("Explained Variance [%]") + xlab("Component") + 
-    ggtitle("Principal Components Contribution")
+plot(x = res$x[,1], y = res$x[,2], main = "Scores - PC1 vs. PC2", xlab = "PC1", ylab = "PC2" )
 print("Principal Components Contributions")
 ```
 
@@ -437,22 +436,34 @@ sprintf("%2.3f", prop)
 ```{r echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 
 # 4.2 - PCA Trace plots
-x = 1:nrow(res$rotation)
-ggplot() + geom_line(aes(x=x, y=res$rotation[,1])) +
-    ggtitle("Traceplot PC1") + ylab("U") + xlab("Index")
-ggplot() + geom_line(aes(x=x, y=res$rotation[,2])) +
-    ggtitle("Traceplots PC2") + ylab("U") + xlab("Index")
+U <-res$rotation
+plot(U[,1], main="PCA - Traceplot PC1")
+plot(U[,2], main="PCA - Traceplot PC2")
 ```
 
 PC1 is explained almost by Viscosity, PC2 explains a linear combination of the other variables.
 
 3. Perform Independent Component Analysis with the number of components selected in step 1 (set seed 12345). Check the documentation for the fastICA method in R and do the following:
 
-
-
 a. Compute $W' = K \cdot W$ and present the columns of  $W'$ in form of the trace plots. Compare with the trace plots in step 2 and make conclusions. What kind of measure is represented by the matrix $W'$?
 
+```{r q_3a_fastica, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+
+# 4.3.a - Fast ICA
+
+ica <- fastICA(X = data, n.comp = 2, alg.typ = "parallel")
+W_ <- ica$K %*% ica$W
+plot(W_[,1], title="ICA - Traceplot PC1")
+plot(W_[,2], title="ICA - Traceplot PC2")
+
+```
+
 b. Make a plot of the scores of the first two latent features and compare it with the score plot from step 1.
+
+```{r}
+# 4.3.b - Scores
+plot(x = ica$S[,1], y = ica$S[,2], main = "Scores - PC1 vs. PC2", xlab = "PC1", ylab = "PC2" )
+```
 
 
 
