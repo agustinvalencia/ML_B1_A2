@@ -433,7 +433,7 @@ sprintf("%2.3f", prop)
 
 2. Make trace plots of the loadings of the components selected in step 1. Is there any principle component that is explained by mainly a few original features?
 
-```{r echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+```{r q4_PCA_traceplots, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 
 # 4.2 - PCA Trace plots
 U <-res$rotation
@@ -447,7 +447,7 @@ PC1 is explained almost by Viscosity, PC2 explains a linear combination of the o
 
 a. Compute $W' = K \cdot W$ and present the columns of  $W'$ in form of the trace plots. Compare with the trace plots in step 2 and make conclusions. What kind of measure is represented by the matrix $W'$?
 
-```{r q_3a_fastica, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+```{r q4_3a_fastica, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 
 # 4.3.a - Fast ICA
 
@@ -460,7 +460,7 @@ plot(W_[,2], title="ICA - Traceplot PC2")
 
 b. Make a plot of the scores of the first two latent features and compare it with the score plot from step 1.
 
-```{r}
+```{r q4_3b_ica_scores, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 # 4.3.b - Scores
 plot(x = ica$S[,1], y = ica$S[,2], main = "Scores - PC1 vs. PC2", xlab = "PC1", ylab = "PC2" )
 ```
