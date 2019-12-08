@@ -128,8 +128,10 @@ predictions <- predict(giniTree, newdata = test, type = "class")
 get_performance(true, predictions, "Tree. split = gini")
 ```
 
-In summary, the tree trained using deviance as split method performs slighty better than the one using Gini index because it gets better True Positive and Misclassification rates, also it is considerably smaller having 12 terminal nodes against the 70 from the Gini one.
+In summary, the tree trained using deviance as split method performs better than the one using Gini Index given its misclassification rate and its true positives rate. Also, the one with deviance is considerably smaller than the Gini one, this size difference might show some grade of overfitting in the later.
 
+
+\newpage
 3. Use training and validation sets to choose the optimal tree depth. Present the graphs of the dependence of deviances for the training and the validation data on the number of leaves. Report the optimal tree, report it’s depth and the variables used by the tree. Interpret the information provided by the tree structure. Estimate the misclassification rate for the test data.
 
 Crossvalidating the deviance-trained tree:
@@ -182,7 +184,23 @@ cat("The optimal tree is at depth", results$optimalDepth, "with deviance", resul
 
 ```
 
-In the graph are shown the deviances obtained depending on the depths. Black curve corresponds to train scores and orange to validation. The optimal tree while using validation data is at depth = 4 having a deviance of 310.41
+In the graph above it is shown the deviances scores obtained by pruned trees for the given depths for both, training and testing data. Considering testing data as the one in which the selection decision has to been based on, it can be seen that the optimal depth is 4 in which the lowest deviance is obtained (282.7)
+
+Said that, the optimal tree is the following: 
+
+```{r q2_optimal_tree, echo=FALSE, warning=FALSE, out.height='30%', fig.align='center'}
+devTree <- tree(formula = f, data = train, split = "deviance")
+optTree <- prune.tree(devTree, best = results$optimalDepth)
+plot(optTree)
+text(optTree)
+```
+
+For which the performance under testing data is: 
+
+```{r q2_optimal_tree_performance, echo=FALSE, warning=FALSE, out.height='30%', fig.align='center'}
+predictions <- predict(optTree, newdata = test, type = "class")
+get_performance(test$good_bad, predictions, "Optimal Tree - test data")
+```
 
 
 4. Use training data to perform classification using Naïve Bayes and report the confusion matrices and misclassification rates for the training and for the test data. Compare the results with those from step 3.
@@ -200,19 +218,15 @@ get_performance(test$good_bad, nbTestPred, "Naive Bayes - test")
 
 ```
 
+Although tree classifier seems to perform better given that it gets the lowest misclassification rate under testig data, Naïve Bayes classifier gets better True Positives rate, which, depending on the application of the predictor, might be more desireable than the other.
+
+For this particular application in which it is desired to get the loans paid, misclasification could be considered more important, so Tree classifier is chosen to be deployed.
+
+Overall, none of two outstands in their performance.
 
 5. Use the optimal tree and the Naïve Bayes model to classify the test data by using the following principle: $\hat{Y} = 1$ if $p(Y=good|X) > \pi$, otherwise $\hat{Y}=0$ where $\pi = 0.05, 0.1, 0.15, ..., 0.9, 0.95$. Compute the TPR and FPR values for the two models and plot the corresponding ROC curves. Conclusion?
 
-Based on the results above we construct the optimal tree and it is obtained: 
-
-```{r q2_optimal_tree, echo=FALSE, warning=FALSE, out.height='30%', fig.align='center'}
-devTree <- tree(formula = f, data = train, split = "deviance")
-optTree <- prune.tree(devTree, best = results$optimalDepth)
-plot(optTree)
-text(optTree)
-```
-
-Then using the given thresholds the following ROC are obtained:
+Using the given thresholds the following ROC are obtained:
 
 ```{r q2_roc_curves, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
 nbTestPred <- predict(nb, newdata=test, type="raw")
@@ -231,14 +245,14 @@ otTP = vector(length = length(thresholds))
 for(i in 1:length(thresholds)) {
     # Naive Bayes
     nbPred <- as.numeric(nbTestPred > thresholds[i])
-    nbPredFactor <- factor(x = nbPred, levels = c(0,1), labels=c("good", "bad"))
+    nbPredFactor <- factor(x = nbPred, levels = c(0,1), labels=c("bad", "good"))
     nbTable <- table(test$good_bad, nbPredFactor)
     nbFP[i] <- nbTable[1,2]
     nbTP[i] <- nbTable[2,2]
 
     # Optimal Tree
     otPred <- as.numeric(otTestPred > thresholds[i])
-    otPredFactor <- factor(x = otPred, levels = c(0,1), labels=c("good", "bad"))
+    otPredFactor <- factor(x = otPred, levels = c(0,1), labels=c("bad", "good"))
     otTable <- table(test$good_bad, otPredFactor)
     otFP[i] <- otTable[1,2]
     otTP[i] <- otTable[2,2]
@@ -252,20 +266,45 @@ otTPR <- otTP/totalPositive
 p <- ggplot()
 p <- p + geom_line(aes(x=nbFPR, y=nbTPR, color="Naive Bayes"))
 p <- p + geom_line(aes(x=otFPR, y=otTPR, color="Optimal Tree"))
+p <- p + geom_line(aes(x=otFPR, y=otFPR, color="TPR=FPR"))
 p <- p + ylab("TPR") + xlab("FPR") + ggtitle("ROCs")
 p
 
 ```
 
 
-6. Repeat Naïve Bayes classification as it was in step 4 but use the following loss matrix.  and report the confusion matrix for the training and test data. Compare the results with the results from step 4 and discuss how the rates have changed and why.
+The blue line represents where the false positive rate is equal than the true positive rates. As it has been said in the previous question, though Naïve Bayes seems to show worse misclassification rates, it tends to get better results regarding true positives and that can be seen on the ROC curve. At higher thresholds Naîve Bayes seems to perform better than the tree classifier. 
 
-```{r q2_6, echo=FALSE}
+6. Repeat Naïve Bayes classification as it was in step 4 but use the following loss matrix. 
 
+```{r include_matrix_fig, echo=FALSE, fig.align='center', out.height = '10%'}
+knitr::include_graphics("img/loss_matrix.png")
 ```
 
+and report the confusion matrix for the training and test data. Compare the results with the results from step 4 and discuss how the rates have changed and why.
 
-\newpage
+```{r q2_6, echo=FALSE}
+lossMatrix <- matrix(c(0,10,1,0), ncol=2)
+print("Loss Matrix")
+lossMatrix
+
+# Getting a new clean naive bayes classifier
+nbClass <- naiveBayes(good_bad ~ . , data = train)
+nbTrainPred <- predict(nbClass, newdata=train, type="raw")
+nbRuleBasedPred <- nbTrainPred[,1]/nbTrainPred[,2] 
+nbRuleBasedPred <- as.numeric(nbRuleBasedPred > lossMatrix[2,1]/lossMatrix[1,2])
+nbRuleBasePred_factor <- factor(x=nbRuleBasedPred, levels = c(1,0), labels=c("good", "bad"))
+get_performance(train$good_bad, nbRuleBasePred_factor, "Naive Bayes new rule - Training")
+
+# Same for training data
+nbTestPred <- predict(nbClass, newdata=test, type="raw")
+nbRuleBasedPred <- nbTestPred[,1]/nbTestPred[,2] 
+nbRuleBasedPred <- as.numeric(nbRuleBasedPred > lossMatrix[2,1]/lossMatrix[1,2])
+nbRuleBasePred_factor <- factor(x=nbRuleBasedPred, levels = c(1,0), labels=c("good", "bad"))
+get_performance(test$good_bad, nbRuleBasePred_factor, "Naive Bayes new rule - Test")
+```
+
+The new loss matrix penalizes ten times more the false positives, then misclassification rates are lower than before.
 
 # Assignment 3 : Uncertainty estimation
 
@@ -314,13 +353,13 @@ plot(cv.regTree$size, cv.regTree$dev, type="b", col="red")
 It can be observed that the optimal tree performance is at size=3. Pruning the tree to fit that it is obtained the following tree:
 
 
-```{r q3_tree_prune, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+```{r q3_tree_prune, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='30%'}
 optTree <- prune.tree(regTree, best = 3)
 plot(optTree)
 text(optTree)
 ```
 
-Comparing the actual data to the predictions made by the tree:
+Comparing the predictions made by the optimal tree against the actual data:
 
 ```{r q3_tree_predictions, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 predictions <- predict(optTree, newdata = data)
@@ -336,10 +375,15 @@ And analyzing the residuals for the shown predictions:
 ```{r q3_tree_residuals, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 residuals <- data$EX - predictions
 h <- ggplot(as.data.frame(residuals), aes(x=residuals))
-h <- h + geom_histogram()
+h <- h + geom_histogram(bins = 15)
 h <- h + ggtitle("Residuals Histogram")
 h
+
+cat("Residuals mean:", mean(residuals), "\n")
+cat("Residuals variance:", var(residuals), "\n")
 ```
+
+While visualy analizing the residuals it seems to follow a bell curve skewed to the right, though when checking the statistics from them it can be seen that its mean is close to zero and have a huge variance. Given the little amount of data it is not simple to argue a certain distribution, so it is recommended to assume a Gaussian distribution with mean zero.
 
 
 3. Compute and plot the 95% confidence bands for the regression tree model from step 2 (fit a regression tree with the same settings and the same number of leaves as in step 2 to the resampled data) by using a non-parametric bootstrap. Comment whether the band is smooth or bumpy and try to explain why. Consider the width of the confidence band and comment whether results of the regression model in step 2 seem to be reliable.
@@ -414,34 +458,49 @@ data <- read.csv2("data/NIRSpectra.csv")
 
 According to the following plot very few Principal Components explain most of the variance, which implies that the data set dimension could be reduced from over a hundred to just a few variables. 
 
-```{r q4_PCA_plot, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
-
+```{r q4_PCA_explained_var, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 # 4.1 - PCA
 res <- prcomp(data) 
 lambda <- res$sdev^2
 prop <- lambda/sum(lambda) * 100
-plot(x = res$x[,1], y = res$x[,2], main = "Scores - PC1 vs. PC2", xlab = "PC1", ylab = "PC2" )
-print("Principal Components Contributions")
+prop <- prop[order(prop, decreasing = TRUE)]
+ggplot() + geom_point(aes(x=1:length(prop), y=prop)) +
+    ggtitle("Variance Explained by Principal Components") +
+    xlab("Principal Components") + ylab("Explained Variance [%]") +
+    scale_y_continuous(breaks = seq(0, 110, by=10))
 ```
 
-The printout below confirms that just the two first PCs represent 99.64% of the total variance. So the dimensionality could be reduced from 127 dimensions to just two.
+
+The printout below (close to zero values have been omitted) confirms that, after sorting their contributions, just the two first PCs represent 99.64% of the total variance. So the dimensionality could be reduced from 127 dimensions to just two.
 
 ```{r q4_PCA_text, echo=FALSE}
-sprintf("%2.3f", prop)
+print("Principal Components Contributions")
+sprintf("%2.3f", prop[1:16])
 ```
 
+The following plot show how the data is explained when the dimensionality is reduced to two principal components out of 127. Since these two new features are a linear combination of the 127 original characteristics, it looses interpretability, though for computational purposes it implies a good improvement. It can be seen some anormalities along the PC1
+
+```{r q3_PCA_pc1vspc2, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+ggplot() + geom_point( aes(x=res$x[,2], y=res$x[,1]) ) +
+    ggtitle("Scores - PC1 vs PC2") +
+    xlab("PC1") + ylab("PC2")
+
+```
 
 2. Make trace plots of the loadings of the components selected in step 1. Is there any principle component that is explained by mainly a few original features?
 
 ```{r q4_PCA_traceplots, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 
 # 4.2 - PCA Trace plots
-U <-res$rotation
-plot(U[,1], main="PCA - Traceplot PC1")
-plot(U[,2], main="PCA - Traceplot PC2")
+U <- res$rotation
+x <- 1:nrow(res$rotation)
+ggplot() + geom_point(aes(x=x, y=U[,1])) + ggtitle("PCA - Traceplot PC1") +
+    xlab("Index") + ylab("Load")
+ggplot() + geom_point(aes(x=x, y=U[,2])) + ggtitle("PCA - Traceplot PC2") + 
+    xlab("Index") + ylab("Load") 
 ```
 
-PC1 is explained almost by Viscosity, PC2 explains a linear combination of the other variables.
+PC1 is explained mainly by the last variable in the original space which refers to viscosity measures, on the other hand PC2 explains a linear combination of the other variables.
 
 3. Perform Independent Component Analysis with the number of components selected in step 1 (set seed 12345). Check the documentation for the fastICA method in R and do the following:
 
@@ -450,20 +509,27 @@ a. Compute $W' = K \cdot W$ and present the columns of  $W'$ in form of the trac
 ```{r q4_3a_fastica, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 
 # 4.3.a - Fast ICA
-
 ica <- fastICA(X = data, n.comp = 2, alg.typ = "parallel")
 W_ <- ica$K %*% ica$W
-plot(W_[,1], title="ICA - Traceplot PC1")
-plot(W_[,2], title="ICA - Traceplot PC2")
-
+ggplot() + geom_point(aes(x=x, y=W_[,1])) + ggtitle("ICA - Traceplot PC1") +
+    xlab("Index") + ylab("W'")
+ggplot() + geom_point(aes(x=x, y=W_[,2])) + ggtitle("ICA - Traceplot PC2") +
+    xlab("Index") + ylab("W'")
 ```
+
+
+$W$ matrix contains the unmixing coefficients. It can be seen that the traceplots from it are somewhat similar to the ones from PCA but in a mirrored fashion. This will allow to \emph{undo} the compression done in PCA and get again the original variables.
 
 b. Make a plot of the scores of the first two latent features and compare it with the score plot from step 1.
 
 ```{r q4_3b_ica_scores, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 # 4.3.b - Scores
-plot(x = ica$S[,1], y = ica$S[,2], main = "Scores - PC1 vs. PC2", xlab = "PC1", ylab = "PC2" )
+ggplot() + geom_point( aes(x=ica$S[,2], y=ica$S[,1]) ) +
+    ggtitle("Scores - IC1 vs IC2") +
+    xlab("IC1") + ylab("IC2")
 ```
+
+It can be seen that the scores looks rotated when compared to the PCA scores.
 
 
 
