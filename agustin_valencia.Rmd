@@ -390,27 +390,24 @@ While visualy analizing the residuals it seems to follow a bell curve skewed to 
 
 ```{r q3_nonparam_bootstrap, echo=FALSE}
 
-doBoot <- function(inData, ind) {
-    # extract bootstrap sample
-    localData <- inData[ind,]
-    n <- nrow(localData)
-    # fit the model
-    fit <- tree(EX ~ MET, localData, 
-                control = tree.control(nobs=n, minsize=8)
-           )
-    pruned <- prune.tree(fit, best=3)
-    predictions <- predict(pruned, newdata=localData)
-    return(predictions)
+doBoot <- function(data, ind) {
+    data1 <- data[ind,]
+    fit <- tree(EX~MET,
+                data=data1,
+                control = tree.control(minsize = 8,nobs = nrow(data))
+            )
+    prunedTree <- prune.tree(fit,best=3)
+    pred <- predict(prunedTree,data)
+    return(pred)
 }
 
 res <- boot(data, doBoot, R=1000)
 envlp <- envelope(res, level=0.95)
-
-# plot(x=data$MET, y = predictions, xlab="MET", ylab="EX",
-#      type="o", col="red", main="Regression Tree 95%")
-# points(x=data$MET, y=data$EX)
-# points(x=data$MET, y=envlp$point[1,], type="l", col="blue")
-# points(x=data$MET, y=envlp$point[2,], type="l", col="blue")
+fit <- tree(EX ~ MET, data=data, 
+                control = tree.control(nobs=nrow(data), minsize = 8)
+        )
+optTree <- prune.tree(fit, best=3)
+predictions <- predict(optTree, newdata=data)
 
 df <- data.frame(
     MET = data$MET,
@@ -421,7 +418,7 @@ df <- data.frame(
 )
 
 p <- ggplot(data = df)
-p <- p + geom_ribbon(aes(x=MET, ymax=upBound, ymin=lowBound), color="gray")
+p <- p + geom_ribbon(aes(x=MET, ymax=upBound, ymin=lowBound), alpha=0.5)
 p <- p + geom_point(aes(x=MET, y=EX, color="real"))
 p <- p + geom_line(aes(x=MET, y=predictions, color="predicted"))
 p <- p + geom_point(aes(x=MET, y=predictions, color="predicted"))
@@ -431,27 +428,89 @@ p
 
 ```
 
-
+In the plot it can be seen that there is a non-minor amount of observations outside the confidence region.
 
 4. Compute and plot the 95% confidence and prediction bands the regression tree model from step 2 (fit a regression tree with the same settings and the same number of leaves as in step 2 to the resampled data) by using a parametric bootstrap, assume $Y ~ N(\mu_i, \sigma^2)$ where $\mu_i$ are labels in the tree leaves and $\sigma^2$ is the residual variance. Consider the width of the confidence band and comment whether results of the regression model in step 2 seem to be reliable. Does it look like only 5% of data are outside the prediction band? Should it be?
 
-5. Consider the histogram of residuals from step 2 and suggest what kind of bootstrap is actually more appropriate here.
+
+```{r, echo=FALSE}
+regTree <- tree(formula = EX ~ MET,
+                data = data,
+                control = tree.control(nobs = nrow(data), minsize = 8)
+            )
+mle <- prune.tree(regTree, best = 3)
+
+rng <- function(data, mle){
+  data1 <- data.frame(EX=data$EX, MET=data$MET)
+  data1$EX <- rnorm( length(data1$EX), predict(mle,data1), sd=sd(residuals(mle)))
+  return(data1)
+}
+
+f <- function(data1){
+  tree <- tree(EX~MET, 
+               data=data1, 
+               control = tree.control(minsize = 8,nobs = nrow(data))
+            )
+  pTree <- prune.tree(tree, best=3)
+  pred <- predict(pTree, data)
+  pred <- rnorm(length(pred),
+                mean=pred,
+                sd=sd(residuals(mle))
+        )
+  return(pred)
+}
+
+boot_res1 <- boot(data,
+                  statistic = f,
+                  R = 1000,
+                  mle = mle,
+                  ran.gen = rng,
+                  sim = "parametric"
+            )
+
+enlvp <- envelope(boot_res1, level = 0.95)
+
+tMod <- tree(EX~MET,
+                 data=data,
+                 control = tree.control(minsize = 8,nobs = nrow(data))
+            )
+prunedTree <- prune.tree(tMod, best=3) 
+pred <- predict(prunedTree, data)
+
+df <- data.frame(
+    EX = data$EX,
+    MET = data$MET,
+    upBound = envlp$point[1,],
+    lowBound = envlp$point[2,],
+    pred = pred
+)
+
+p <- ggplot(data = df)
+p <- p + geom_ribbon(aes(x=MET, ymax=upBound, ymin=lowBound), alpha=0.5)
+p <- p + geom_point(aes(x=MET, y=EX, color="real"))
+p <- p + geom_line(aes(x=MET, y=predictions, color="predicted"))
+p <- p + geom_point(aes(x=MET, y=predictions, color="predicted"))
+p <- p + ylab("EX") + xlab("EM") + ggtitle("Regression Tree - Non-param Bootstrap")
+p <- p + scale_y_continuous(breaks = seq(0, 600, by=20))
+p
+```
+
+
+5. Consider the histogram of residuals from step 2 and suggest what kind of bootstrap is actually more appropriate here.e
+
+If we assume the residuals follow a normal distribution, then Parametric bootstrap is more suitable.
 
 
 \newpage
 
 # Assignment 4 - Principal components
 
+
 The data file NIRspectra.csv contains near-infrared spectra and viscosity levels for a collection of diesel fuels. Your task is to investigate how the measured spectra can be used to predict the viscosity.
+
 ```{r q4_init, echo=FALSE, message=FALSE, warning=FALSE}
-
-
-
-#### -----------------------------------------
-####                Question 4
-#### -----------------------------------------
-
 data <- read.csv2("data/NIRSpectra.csv")
+data <- data[,-ncol(data)]
 ```
 
 1. Conduct a standard PCA by using the feature space and provide a plot explaining how much variation is explained by each feature. Does the plot show how many PC should be extracted? Select the minimal number of components explaining at least 99% of the total variance. Provide also a plot of the scores in the coordinates (PC1, PC2). Are there unusual diesel fuels according to this plot?
@@ -471,7 +530,7 @@ ggplot() + geom_point(aes(x=1:length(prop), y=prop)) +
 ```
 
 
-The printout below (close to zero values have been omitted) confirms that, after sorting their contributions, just the two first PCs represent 99.64% of the total variance. So the dimensionality could be reduced from 127 dimensions to just two.
+The printout below (close to zero values have been omitted) confirms that, after sorting their contributions, just the two first PCs represent 99.6% of the total variance. So the dimensionality could be reduced from 127 dimensions to just two.
 
 ```{r q4_PCA_text, echo=FALSE}
 print("Principal Components Contributions")
@@ -481,7 +540,7 @@ sprintf("%2.3f", prop[1:16])
 The following plot show how the data is explained when the dimensionality is reduced to two principal components out of 127. Since these two new features are a linear combination of the 127 original characteristics, it looses interpretability, though for computational purposes it implies a good improvement. It can be seen some anormalities along the PC1
 
 ```{r q3_PCA_pc1vspc2, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
-ggplot() + geom_point( aes(x=res$x[,2], y=res$x[,1]) ) +
+ggplot() + geom_point( aes(x=res$x[,1], y=res$x[,2]) ) +
     ggtitle("Scores - PC1 vs PC2") +
     xlab("PC1") + ylab("PC2")
 
@@ -500,11 +559,14 @@ ggplot() + geom_point(aes(x=x, y=U[,2])) + ggtitle("PCA - Traceplot PC2") +
     xlab("Index") + ylab("Load") 
 ```
 
-PC1 is explained mainly by the last variable in the original space which refers to viscosity measures, on the other hand PC2 explains a linear combination of the other variables.
 
-3. Perform Independent Component Analysis with the number of components selected in step 1 (set seed 12345). Check the documentation for the fastICA method in R and do the following:
+It can be seen that the two components are comprised by a linear combination of all the original variables. Although for the first component, the contributions come mainly for the first variables, and in the second the opposite, no weight represents more than a half of all the weights, thus it cannot be said that there is a principal component being represented mainly by one in the original space. 
 
-a. Compute $W' = K \cdot W$ and present the columns of  $W'$ in form of the trace plots. Compare with the trace plots in step 2 and make conclusions. What kind of measure is represented by the matrix $W'$?
+ 3. Perform Independent Component Analysis with the number of components selected in step 1 (set seed 12345). Check the documentation for the fastICA method in R and do the following:
+
+ a. Compute $W' = K \cdot W$ and present the columns of  $W'$ in form of the trace plots. Compare with the trace plots in step 2 and make conclusions. What kind of measure is represented by the matrix $W'$?
+
+$W$ matrix contains the unmixing coefficients. It can be seen that the traceplots from it are somewhat similar but in a mirrored fashion. This will allow to \emph{undo} the compression and get an approximation of the original variables before PCA.
 
 ```{r q4_3a_fastica, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 
@@ -518,13 +580,12 @@ ggplot() + geom_point(aes(x=x, y=W_[,2])) + ggtitle("ICA - Traceplot PC2") +
 ```
 
 
-$W$ matrix contains the unmixing coefficients. It can be seen that the traceplots from it are somewhat similar to the ones from PCA but in a mirrored fashion. This will allow to \emph{undo} the compression done in PCA and get again the original variables.
 
-b. Make a plot of the scores of the first two latent features and compare it with the score plot from step 1.
+ b. Make a plot of the scores of the first two latent features and compare it with the score plot from step 1.
 
 ```{r q4_3b_ica_scores, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 # 4.3.b - Scores
-ggplot() + geom_point( aes(x=ica$S[,2], y=ica$S[,1]) ) +
+ggplot() + geom_point( aes(x=ica$S[,1], y=ica$S[,2]) ) +
     ggtitle("Scores - IC1 vs IC2") +
     xlab("IC1") + ylab("IC2")
 ```
