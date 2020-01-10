@@ -52,7 +52,7 @@ The data file australian-crabs.csv contains measurements of various crabs, such 
 
 Plotting the data
 
-```{r crab1}
+```{r crab1, out.height='40%', fig.align='center'}
 data <- read.csv2("data/australian-crabs.csv", sep = ",", dec=".")
 males <- data[which(data$sex == "Male"),]
 females <- data[which(data$sex == "Female"),]
@@ -67,7 +67,7 @@ Since LDA maximize the separability between classes it might be a good choice to
 
 2. Make LDA analysis with target Sex and features CL and RW and propostional prior by using ```lda()``` function in package ```MASS```. Make a scatterplot of CL versus RW colored by the predicted Sex and compare it with the plot in step 1. Compute the misclassification error and comment on the quality of fit. 
 
-```{r}
+```{r, out.height='40%', fig.align='center'}
 ldaModel <- lda( sex ~ RW + CL, data = data)
 predictions <- predict(ldaModel, data)
 predictedData <- data.frame(
@@ -86,8 +86,74 @@ ggplot() + ggtitle("Sex Classification using LDA : Sex ~ RW + CL") +
 get_performance(data$sex, predictions$class, "Sex classification using LDA")
 ```
 
-Now it can be seen that no classes are overlapped which means that there are some classification errors.
+Now it can be seen that no classes are overlapped which means that, as it has been computed, there is 3.5% of misclassification error.
 
+
+
+3. Repeat step 2 but use priors $p(Male) = 0.9$ and $p(Female) = 0.1$ instead. How did the classification result change and why?
+
+
+```{r, out.height='40%', fig.align='center'}
+ldaModel <- lda( sex ~ RW + CL, data = data, prior = c(0.1, 0.9))
+predictions <- predict(ldaModel, data)
+predictedData <- data.frame(
+  sex <- predictions$class,
+  CL <- data$CL,
+  RW <- data$RW
+)
+ggplot() + ggtitle("Sex Classification using LDA : Sex ~ RW + CL | M=90%, F=10%") +
+    geom_point(aes(y = predictedData[which(sex == "Female"), ]$CL, 
+                   x = predictedData[which(sex == "Female"), ]$RW, 
+                   color = "Females")) +
+    geom_point(aes(y = predictedData[which(sex == "Male"), ]$CL, 
+                   x = predictedData[which(sex == "Male"), ]$RW, 
+                   color = "Males")) +
+    xlab("Rear Width") + ylab("Carapace Length") 
+get_performance(data$sex, predictions$class, "Sex classification using LDA")
+```
+
+Now the classification, as the proportion is 9 to 1 for males, is likely to classify samples as males. This can be seen in the difficult to classify ones, in which most of them have been classified as males which has increased the misclassification erro to 8%. 
+
+4. Make a similar kind of classification by logistic regression (use function ```glm()```), plot the classified data and compute the misclassification error. Compare there results with the LDA results. Finally, report the equation of the decision boundary and draw the decision boundary in the plot of the classified data. 
+
+```{r, out.height='40%', fig.align='center'}
+logRegModel <- glm(sex ~ RW + CL, data = data, family = "binomial")
+logRegResponse <- predict(logRegModel, data=data, type="response")
+logRegResponse <- as.numeric(logRegResponse > .5)
+logRegPredictions <- factor(logRegResponse, levels=c(0,1), labels=c("Female","Male"))
+get_performance(data$sex, logRegPredictions, "Logistic regression classification")
+
+predMalesIdx <- which(logRegPredictions == "Male")
+predMales <- data[predMalesIdx,]
+predFemales <- data[-predMalesIdx,]
+
+coeff <- coefficients(logRegModel)
+coeff
+bias <- coeff[1]
+RW <- coeff[2]
+CL <- coeff[3]
+
+p <- ggplot() + ggtitle("Logistic regression classification") +
+  geom_point(aes(x=predMales$RW, y=predMales$CL, color="Males")) +
+  geom_point(aes(x=predFemales$RW, y=predFemales$CL, color="Females")) +
+  xlab("Rear Width") + ylab("Carapace Length")
+
+#xmin <- p$plot_env$xmin
+#xmax <- p$plot_env$xmax
+xmin <- 6.7
+xmax <- 20.2
+
+x <- seq(from = xmin, to = xmax, by = .1)
+y <- vector(length=length(x))
+y <- (bias + RW * x) / (-1 * CL)
+
+p <- p + geom_line(aes(x=x, y=y, color="Model"))
+p
+```
+
+Given the obtained coefficients, the boundary equation is the following: 
+
+$$y = - \frac{13.616628 + -12.563893 x}{4.630747} $$
 
 # Assignment 2. Analysis of credit scoring
 
@@ -96,7 +162,7 @@ The data file creditscoring.xls contains data retrieved from a database in a pri
 
 1. Import the data to R and divide into training/validation/test as 50/25/25: use data partitioning code specified in Lecture 1e.
 
-```{r q2_split_data, echo=FALSE}
+```{r q2_split_data }
 
 
 
@@ -132,7 +198,7 @@ cat("Testing set size \t:", dim(test))
 
 2. Fit a decision tree to the training data by using the following measures of impurity and report the misclassification rates for the training and test data. Choose the measure providing the better results for the following steps.
 
-```{r q2_tree_main, echo=FALSE}
+```{r q2_tree_main}
 
 ## 2.2 Trees 
 
@@ -144,7 +210,7 @@ f <- good_bad ~ .
 
 a. Deviance
 
-```{r q2_tree_deviance, echo=FALSE, out.height='30%', fig.align='center'}
+```{r q2_tree_deviance,  out.height='30%', fig.align='center'}
 
 
 ### 1.2.a Deviance Tree
@@ -178,12 +244,11 @@ get_performance(true, predictions, "Tree. split = gini")
 In summary, the tree trained using deviance as split method performs better than the one using Gini Index given its misclassification rate and its true positives rate. Also, the one with deviance is considerably smaller than the Gini one, this size difference might show some grade of overfitting in the later.
 
 
-\newpage
 3. Use training and validation sets to choose the optimal tree depth. Present the graphs of the dependence of deviances for the training and the validation data on the number of leaves. Report the optimal tree, report it’s depth and the variables used by the tree. Interpret the information provided by the tree structure. Estimate the misclassification rate for the test data.
 
 Crossvalidating the deviance-trained tree:
 
-```{r q2_devtree_optimal_depth, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
+```{r q2_devtree_optimal_depth, warning=FALSE, out.height='40%', fig.align='center'}
 
 ### 2.3 Optimal depth by train/validation
 
@@ -235,7 +300,7 @@ In the graph above it is shown the deviances scores obtained by pruned trees for
 
 Said that, the optimal tree is the following: 
 
-```{r q2_optimal_tree, echo=FALSE, warning=FALSE, out.height='30%', fig.align='center'}
+```{r q2_optimal_tree, warning=FALSE, out.height='30%', fig.align='center'}
 devTree <- tree(formula = f, data = train, split = "deviance")
 optTree <- prune.tree(devTree, best = results$optimalDepth)
 plot(optTree)
@@ -244,7 +309,7 @@ text(optTree)
 
 For which the performance under testing data is: 
 
-```{r q2_optimal_tree_performance, echo=FALSE, warning=FALSE, out.height='30%', fig.align='center'}
+```{r q2_optimal_tree_performance, warning=FALSE, out.height='30%', fig.align='center'}
 predictions <- predict(optTree, newdata = test, type = "class")
 get_performance(test$good_bad, predictions, "Optimal Tree - test data")
 ```
@@ -253,7 +318,7 @@ get_performance(test$good_bad, predictions, "Optimal Tree - test data")
 4. Use training data to perform classification using Naïve Bayes and report the confusion matrices and misclassification rates for the training and for the test data. Compare the results with those from step 3.
 
 
-```{r q2_naive_bayes, echo=FALSE, warning=FALSE}
+```{r q2_naive_bayes, warning=FALSE}
 
 ### 2.3 Optimal depth by train/validation
 nb <- naiveBayes(f, data=train)
@@ -275,7 +340,7 @@ Overall, none of two outstands in their performance.
 
 Using the given thresholds the following ROC are obtained:
 
-```{r q2_roc_curves, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
+```{r q2_roc_curves, warning=FALSE, out.height='40%', fig.align='center'}
 nbTestPred <- predict(nb, newdata=test, type="raw")
 otTestPred <- predict(optTree, newdata=test, type="vector")
 nbTestPred <- nbTestPred[,"good"]
@@ -324,13 +389,13 @@ The blue line represents where the false positive rate is equal than the true po
 
 6. Repeat Naïve Bayes classification as it was in step 4 but use the following loss matrix. 
 
-```{r include_matrix_fig, echo=FALSE, fig.align='center', out.height = '10%'}
+```{r include_matrix_fig, fig.align='center', out.height = '10%'}
 knitr::include_graphics("img/loss_matrix.png")
 ```
 
 and report the confusion matrix for the training and test data. Compare the results with the results from step 4 and discuss how the rates have changed and why.
 
-```{r q2_6, echo=FALSE}
+```{r q2_6 }
 lossMatrix <- matrix(c(0,10,1,0), ncol=2)
 print("Loss Matrix")
 lossMatrix
@@ -362,7 +427,7 @@ The data file State.csv contains per capita state and local public expenditures 
 
 1. Reorder your data with respect to the increase of MET and plot EX versus MET. Discuss what kind of model can be appropriate here. Use the reordered data in steps 2-5.
 
-```{r q3_reorder, echo=FALSE}
+```{r q3_reorder}
 
 
 
@@ -377,7 +442,7 @@ data <- data[order(data$EX),]
 
 2. Use package tree and fit a regression tree model with target EX and feature MET in which the number of the leaves is selected by cross-validation, use the entire data set and set minimum number of observations in a leaf equal to 8 (setting minsize in tree.control). Report the selected tree. Plot the original and the fitted data and histogram of residuals. Comment on the distribution of the residuals and the quality of the fit.
 
-```{r q3_tree_train, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
+```{r q3_tree_train, warning=FALSE, out.height='40%', fig.align='center'}
 regTree <- tree(formula = EX ~ MET,  
                 data = data,  
                 control = tree.control(nobs = length(data$EX), minsize = 8)
@@ -391,7 +456,7 @@ text(regTree)
 
 Finding the optimal tree using crossvalidation:
 
-```{r q3_tree_plot, echo=FALSE, warning=FALSE, out.height='40%', fig.align='center'}
+```{r q3_tree_plot, warning=FALSE, out.height='40%', fig.align='center'}
 cv.regTree <- cv.tree(regTree)
 plot(cv.regTree$size, cv.regTree$dev, type="b", col="red")
 ```
@@ -400,7 +465,7 @@ plot(cv.regTree$size, cv.regTree$dev, type="b", col="red")
 It can be observed that the optimal tree performance is at size=3. Pruning the tree to fit that it is obtained the following tree:
 
 
-```{r q3_tree_prune, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='30%'}
+```{r q3_tree_prune, fig.align='center', message=FALSE, warning=FALSE, out.height='30%'}
 optTree <- prune.tree(regTree, best = 3)
 plot(optTree)
 text(optTree)
@@ -408,7 +473,7 @@ text(optTree)
 
 Comparing the predictions made by the optimal tree against the actual data:
 
-```{r q3_tree_predictions, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+```{r q3_tree_predictions, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 predictions <- predict(optTree, newdata = data)
 p <- ggplot()
 p <- p + geom_point(aes(x=data$MET, y=data$EX, color="real"))
@@ -419,7 +484,7 @@ p
 
 And analyzing the residuals for the shown predictions:
 
-```{r q3_tree_residuals, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+```{r q3_tree_residuals, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 residuals <- data$EX - predictions
 h <- ggplot(as.data.frame(residuals), aes(x=residuals))
 h <- h + geom_histogram(bins = 15)
@@ -435,7 +500,7 @@ While visualy analizing the residuals it seems to follow a bell curve skewed to 
 
 3. Compute and plot the 95% confidence bands for the regression tree model from step 2 (fit a regression tree with the same settings and the same number of leaves as in step 2 to the resampled data) by using a non-parametric bootstrap. Comment whether the band is smooth or bumpy and try to explain why. Consider the width of the confidence band and comment whether results of the regression model in step 2 seem to be reliable.
 
-```{r q3_nonparam_bootstrap, echo=FALSE}
+```{r q3_nonparam_bootstrap}
 
 doBoot <- function(data, ind) {
     data1 <- data[ind,]
@@ -480,7 +545,7 @@ In the plot it can be seen that there is a non-minor amount of observations outs
 4. Compute and plot the 95% confidence and prediction bands the regression tree model from step 2 (fit a regression tree with the same settings and the same number of leaves as in step 2 to the resampled data) by using a parametric bootstrap, assume $Y ~ N(\mu_i, \sigma^2)$ where $\mu_i$ are labels in the tree leaves and $\sigma^2$ is the residual variance. Consider the width of the confidence band and comment whether results of the regression model in step 2 seem to be reliable. Does it look like only 5% of data are outside the prediction band? Should it be?
 
 
-```{r, echo=FALSE}
+```{r}
 regTree <- tree(formula = EX ~ MET,
                 data = data,
                 control = tree.control(nobs = nrow(data), minsize = 8)
@@ -548,14 +613,13 @@ p
 If we assume the residuals follow a normal distribution, then Parametric bootstrap is more suitable.
 
 
-\newpage
 
 # Assignment 4 - Principal components
 
 
 The data file NIRspectra.csv contains near-infrared spectra and viscosity levels for a collection of diesel fuels. Your task is to investigate how the measured spectra can be used to predict the viscosity.
 
-```{r q4_init, echo=FALSE, message=FALSE, warning=FALSE}
+```{r q4_init, message=FALSE, warning=FALSE}
 data <- read.csv2("data/NIRSpectra.csv")
 data <- data[,-ncol(data)]
 ```
@@ -564,7 +628,7 @@ data <- data[,-ncol(data)]
 
 According to the following plot very few Principal Components explain most of the variance, which implies that the data set dimension could be reduced from over a hundred to just a few variables. 
 
-```{r q4_PCA_explained_var, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+```{r q4_PCA_explained_var, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 # 4.1 - PCA
 res <- prcomp(data) 
 lambda <- res$sdev^2
@@ -579,14 +643,14 @@ ggplot() + geom_point(aes(x=1:length(prop), y=prop)) +
 
 The printout below (close to zero values have been omitted) confirms that, after sorting their contributions, just the two first PCs represent 99.6% of the total variance. So the dimensionality could be reduced from 127 dimensions to just two.
 
-```{r q4_PCA_text, echo=FALSE}
+```{r q4_PCA_text}
 print("Principal Components Contributions")
 sprintf("%2.3f", prop[1:16])
 ```
 
 The following plot show how the data is explained when the dimensionality is reduced to two principal components out of 127. Since these two new features are a linear combination of the 127 original characteristics, it looses interpretability, though for computational purposes it implies a good improvement. It can be seen some anormalities along the PC1
 
-```{r q3_PCA_pc1vspc2, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+```{r q3_PCA_pc1vspc2, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 ggplot() + geom_point( aes(x=res$x[,1], y=res$x[,2]) ) +
     ggtitle("Scores - PC1 vs PC2") +
     xlab("PC1") + ylab("PC2")
@@ -595,7 +659,7 @@ ggplot() + geom_point( aes(x=res$x[,1], y=res$x[,2]) ) +
 
 2. Make trace plots of the loadings of the components selected in step 1. Is there any principle component that is explained by mainly a few original features?
 
-```{r q4_PCA_traceplots, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+```{r q4_PCA_traceplots, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 
 # 4.2 - PCA Trace plots
 U <- res$rotation
@@ -615,7 +679,7 @@ It can be seen that the two components are comprised by a linear combination of 
 
 $W$ matrix contains the unmixing coefficients. It can be seen that the traceplots from it are somewhat similar but in a mirrored fashion. This will allow to \emph{undo} the compression and get an approximation of the original variables before PCA.
 
-```{r q4_3a_fastica, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+```{r q4_3a_fastica, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 
 # 4.3.a - Fast ICA
 ica <- fastICA(X = data, n.comp = 2, alg.typ = "parallel")
@@ -630,7 +694,7 @@ ggplot() + geom_point(aes(x=x, y=W_[,2])) + ggtitle("ICA - Traceplot PC2") +
 
  b. Make a plot of the scores of the first two latent features and compare it with the score plot from step 1.
 
-```{r q4_3b_ica_scores, echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
+```{r q4_3b_ica_scores, fig.align='center', message=FALSE, warning=FALSE, out.height='40%'}
 # 4.3.b - Scores
 ggplot() + geom_point( aes(x=ica$S[,1], y=ica$S[,2]) ) +
     ggtitle("Scores - IC1 vs IC2") +
@@ -641,9 +705,4 @@ It can be seen that the scores looks rotated when compared to the PCA scores.
 
 
 
-\newpage
 
-# Appendix A : Code
-
-```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
-```
